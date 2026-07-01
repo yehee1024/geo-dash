@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>네온 네모 대쉬! (Geometry Square)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons for UI -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 터치 드래그 및 길게 누르기 선택 방지 */
+        body {
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+        /* 네온 깜빡임 애니메이션 */
+        @keyframes neon-pulse {
+            0%, 100% { opacity: 0.8; text-shadow: 0 0 10px #06b6d4, 0 0 20px #0891b2; }
+            50% { opacity: 1; text-shadow: 0 0 15px #22d3ee, 0 0 30px #06b6d4; }
+        }
+        .neon-glow {
+            animation: neon-pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col justify-between overflow-hidden font-sans">
+
+    <!-- 상단 헤더 및 스테이지 인디케이터 -->
+    <header class="p-4 bg-slate-900 border-b border-cyan-500/30 flex justify-between items-center z-10">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 bg-cyan-400 rounded-sm border-2 border-white flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.6)]">
+                <div class="w-3 h-3 bg-slate-900 rounded-sm"></div>
+            </div>
+            <div>
+                <h1 class="text-lg font-black tracking-widest text-cyan-400 neon-glow leading-none">NEON DASH</h1>
+                <span class="text-[10px] text-cyan-500 font-semibold tracking-wider uppercase">Geometry Square</span>
+            </div>
+        </div>
+        <div class="flex items-center space-x-6">
+            <div class="text-right">
+                <div class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Level</div>
+                <div id="stage-display" class="text-xl font-black text-pink-500">STAGE 1</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 게임 영역 -->
+    <main class="flex-grow flex flex-col items-center justify-center p-2 relative">
+        <!-- 게임 캔버스 컨테이너 -->
+        <div id="canvas-container" class="relative w-full max-w-4xl aspect-[16/9] bg-slate-950 rounded-lg overflow-hidden shadow-[0_0_40px_rgba(6,182,212,0.15)] border-2 border-cyan-500/30">
+            
+            <!-- 지오메트리 대쉬 스타일 탑센터 프로그레스 바 -->
+            <div id="progress-container" class="absolute top-6 left-1/2 transform -translate-x-1/2 w-3/5 max-w-md bg-slate-900/80 backdrop-blur-xs h-5 rounded-full border border-cyan-500/40 overflow-hidden hidden z-10 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-cyan-400 via-sky-400 to-pink-500 shadow-[0_0_12px_rgba(34,211,238,0.8)] w-0 transition-all duration-75"></div>
+                <span id="progress-text" class="absolute inset-0 flex items-center justify-center text-[11px] font-black tracking-widest text-white drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.9)]">0%</span>
+            </div>
+
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- 시작 / 가이드 / 게임오버 / 클리어 오버레이 -->
+            <div id="overlay" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center transition-all duration-300">
+                
+                <!-- 메인 대기 화면 -->
+                <div id="start-screen" class="space-y-6">
+                    <h2 class="text-4xl md:text-6xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-pink-500 to-cyan-400 animate-pulse">
+                        GEOMETRY DASH
+                    </h2>
+                    <p class="text-xs md:text-sm text-slate-400 tracking-wider max-w-md mx-auto leading-relaxed">
+                        초반 안전지대 완벽 적용! 스폰킬 방지 완료.<br>
+                        바닥에 단단하게 부착된 장애물을 디디며 최고 속도로 질주하세요.<br>
+                        다양한 네온 포탈과 비밀 점프 기믹들이 가득합니다.
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4">
+                        <button onclick="startGame()" class="px-10 py-4 bg-gradient-to-r from-cyan-400 via-sky-400 to-pink-500 hover:from-cyan-300 hover:to-pink-400 text-slate-950 font-black tracking-widest rounded-full shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:scale-105 active:scale-95 transition-all text-lg uppercase">
+                            <i class="fa-solid fa-play mr-2"></i> 게임 시작하기
+                        </button>
+                        <button onclick="toggleGuideScreen(true)" class="px-8 py-4 bg-slate-900 border border-cyan-500/40 hover:bg-slate-800 text-cyan-400 font-bold tracking-widest rounded-full hover:scale-105 active:scale-95 transition-all text-sm uppercase">
+                            <i class="fa-solid fa-circle-info mr-2"></i> 게임 가이드 보기
+                        </button>
+                    </div>
+                    <div class="text-[11px] text-slate-500 tracking-widest pt-4 font-semibold">
+                        조작 방법: <kbd class="px-1.5 py-0.5 bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded">SPACE</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded">UP ARROW</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 text-cyan-400 border border-cyan-500/30 rounded">화면 터치 및 마우스 클릭</kbd>
+                    </div>
+                </div>
+
+                <!-- 게임 설명 창 (가이드 스크린) -->
+                <div id="guide-screen" class="hidden w-full max-w-2xl bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-6 text-left space-y-4 shadow-[0_0_50px_rgba(6,182,212,0.3)]">
+                    <div class="flex justify-between items-center border-b border-cyan-500/20 pb-3">
+                        <h3 class="text-xl font-black text-cyan-400 tracking-wider"><i class="fa-solid fa-circle-question mr-2"></i>GEOMETRY DASH 기믹 백과사전</h3>
+                        <button onclick="toggleGuideScreen(false)" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs max-h-96 overflow-y-auto pr-1">
+                        <!-- 캐릭터 모드 설명 -->
+                        <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="font-black text-emerald-400 flex items-center gap-2">
+                                <span class="w-3 h-3 bg-emerald-500 rounded-xs"></span> 큐브 포탈 (그린)
+                            </div>
+                            <p class="text-slate-300 leading-relaxed">가장 기본적이고 직관적인 모드입니다. 바닥을 안정적으로 달리며 짧게 탭하여 가시를 점프하여 피합니다. 누르고 있으면 착지 시 자동 연속 점프합니다.</p>
+                        </div>
+
+                        <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="font-black text-pink-500 flex items-center gap-2">
+                                <span class="w-3.5 h-2 bg-pink-500 rounded-sm"></span> 비행기 포탈 (핑크)
+                            </div>
+                            <p class="text-slate-300 leading-relaxed">제트 추진 비행기로 변신합니다. <strong>화면을 꾹 누르고 있으면 상승</strong>하고, 손가락을 떼면 중력에 의해 부드럽게 하강합니다. 정교한 높이 유지가 관건입니다.</p>
+                        </div>
+
+                        <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="font-black text-orange-400 flex items-center gap-2">
+                                <span class="w-3 h-3 bg-orange-500 rounded-full"></span> 볼 포탈 (오렌지)
+                            </div>
+                            <p class="text-slate-300 leading-relaxed">지메 고유의 중력 휠 모드입니다. 공중에 떠 있는 동안에는 반응하지 않으며, 바닥이나 천장에 닿았을 때 <strong>탭하면 중력의 위아래 방향이 즉시 반전</strong>됩니다.</p>
+                        </div>
+
+                        <!-- 블럭 및 장치 설명 -->
+                        <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="font-black text-yellow-400 flex items-center gap-2">
+                                <i class="fa-solid fa-angles-up"></i> 점프 패드 (노란색 스프링)
+                            </div>
+                            <p class="text-slate-300 leading-relaxed">지상 블록 위에 배치된 노란색 장치입니다. 캐릭터가 이 장치를 직접 밟는 순간, 추가 조작 없이도 <strong>자동으로 하늘 높이 전방 점프</strong>를 시전합니다.</p>
+                        </div>
+
+                        <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 col-span-1 md:col-span-2 space-y-2">
+                            <div class="font-black text-yellow-300 flex items-center gap-2">
+                                <i class="fa-regular fa-circle-dot"></i> 점프 링 (공중 노란 링)
+                            </div>
+                            <p class="text-slate-300 leading-relaxed">허공에 떠 있는 밝게 빛나는 링입니다. 캐릭터가 이 링 안의 영역을 스쳐 지나가는 절묘한 타이밍에 맞춰 <strong>공중에서 화면을 탭하면 이단 점프</strong>하듯 위로 크게 튕겨 나갑니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 text-center">
+                        <button onclick="toggleGuideScreen(false)" class="px-8 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-lg text-sm tracking-wider uppercase transition-all">
+                            알겠습니다!
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 게임오버 화면 -->
+                <div id="gameover-screen" class="hidden space-y-6">
+                    <div class="w-16 h-16 bg-pink-600/20 text-pink-500 rounded-full flex items-center justify-center text-3xl mx-auto border border-pink-500 shadow-[0_0_20px_rgba(219,39,119,0.4)] animate-pulse">💥</div>
+                    <h2 class="text-3xl md:text-4xl font-black tracking-widest text-pink-500">CRASHED!</h2>
+                    <p id="gameover-info" class="text-slate-400 text-sm tracking-wider">최종 진행률: <span id="crash-percent" class="text-cyan-400 font-black text-2xl drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">0%</span></p>
+                    <div class="flex justify-center gap-4 pt-2">
+                        <button onclick="restartCurrentGame()" class="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black tracking-wider rounded-md shadow-lg hover:scale-105 transition-all">
+                            <i class="fa-solid fa-rotate-left mr-2"></i>다시 시도
+                        </button>
+                        <button onclick="showMainMenu()" class="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-md shadow-lg hover:scale-105 transition-all">
+                            <i class="fa-solid fa-house mr-2"></i>메인 메뉴
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 스테이지 클리어 화면 -->
+                <div id="clear-screen" class="hidden space-y-6">
+                    <div class="w-16 h-16 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center text-3xl mx-auto border border-cyan-400 shadow-[0_0_25px_rgba(34,211,238,0.4)] animate-bounce">⚡</div>
+                    <h2 class="text-3xl md:text-4xl font-black tracking-widest text-cyan-400">LEVEL COMPLETE!</h2>
+                    <p id="clear-info" class="text-slate-400 text-sm">기하학적 본능으로 모든 시련을 통과했습니다!</p>
+                    <button id="next-stage-btn" onclick="nextStage()" class="px-8 py-4 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black tracking-widest rounded-md shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:scale-105 transition-all text-lg">
+                        NEXT LEVEL <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+
+                <!-- 최종 완성 클리어 화면 -->
+                <div id="game-complete-screen" class="hidden space-y-6">
+                    <div class="w-20 h-20 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-full flex items-center justify-center text-4xl text-white mx-auto border-4 border-white animate-spin shadow-[0_0_40px_rgba(219,39,119,0.6)]">👑</div>
+                    <h2 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-400 tracking-wider">GODLIKE DASH</h2>
+                    <p class="text-slate-400 max-w-md mx-auto text-xs md:text-sm tracking-widest leading-relaxed">
+                        전설이 탄생했습니다! 지오메트리 광장 최후의 수호자가 되어 모든 레벨의 종착점에 도달했습니다.
+                    </p>
+                    <button onclick="showMainMenu()" class="px-8 py-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black tracking-widest rounded-md shadow-lg hover:scale-105 transition-transform text-lg">
+                        메인으로 돌아가기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 모바일/PC 원터치 컨트롤 구역 -->
+    <footer class="p-6 bg-slate-900 border-t border-cyan-500/20 text-center select-none">
+        <div class="max-w-md mx-auto">
+            <button id="tap-zone" class="w-full h-20 bg-gradient-to-r from-cyan-500/20 via-pink-500/10 to-cyan-500/20 active:from-cyan-500/30 active:to-pink-500/20 border-2 border-dashed border-cyan-500/40 rounded-xl flex items-center justify-center text-cyan-400 font-black tracking-widest shadow-inner active:scale-95 transition-all duration-75">
+                <i class="fa-solid fa-hand-pointer text-xl mr-3 animate-ping"></i> 누르거나 터치하여 조작 (HOLD / TAP)
+            </button>
+            <p class="text-[10px] text-slate-400 mt-2 font-bold tracking-widest">
+                <span class="text-cyan-400">CUBE</span>: 단발 탭 점프 | 
+                <span class="text-pink-400">SHIP</span>: 꾹 누르면 상승, 떼면 하강 | 
+                <span class="text-orange-400">BALL</span>: 탭하면 중력 위아래 즉시 반전
+            </p>
+        </div>
+    </footer>
+
+    <!-- 자바스크립트 엔진 구현 -->
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 가상 캔버스 크기 (16:9 해상도 고정)
+        const VIEW_WIDTH = 1600;
+        const VIEW_HEIGHT = 900;
+
+        // 게임 상태 정의
+        const STATE_MENU = 'menu';
+        const STATE_PLAYING = 'playing';
+        const STATE_GAMEOVER = 'gameover';
+        const STATE_CLEAR = 'clear';
+        const STATE_COMPLETE = 'complete';
+
+        // 캐릭터 모드 정의
+        const MODE_CUBE = 'cube';
+        const MODE_SHIP = 'ship';
+        const MODE_BALL = 'ball';
+
+        let gameState = STATE_MENU;
+        let currentStage = 1;
+        let progressPercent = 0; // 진행율 %
+
+        // 지오메트리 대쉬 물리 상수
+        const GRAVITY_CUBE = 1.35;
+        const JUMP_FORCE_CUBE = 21.0;
+        const GRAVITY_SHIP = 0.58;
+        const THRUST_SHIP = 1.15;
+        const SPEED_X = 12.0; // 강제 고속 자동 질주
+
+        // 카메라 시스템
+        const camera = {
+            x: 0,
+            y: 0,
+            targetX: 0
+        };
+
+        // 플레이어 캐릭터 객체
+        const player = {
+            x: 100,
+            y: 500,
+            width: 55,
+            height: 55,
+            vy: 0,
+            mode: MODE_CUBE,
+            isGrounded: false,
+            trail: [],
+            rotation: 0,
+            thrustFlameTick: 0,
+            gravityDirection: 1 // 1: 정상 중력, -1: 반전 중력 (볼 모드 대응)
+        };
+
+        // 원터치 단일 입력 제어
+        let actionPressed = false;
+        let prevActionPressed = false; // "단발성 터치" 감지용 이전 프레임 입력 체크
+
+        // 게임 오브젝트 리스트
+        let platforms = [];
+        let spikes = [];
+        let portals = []; 
+        let jumpPads = []; // 자동 점프 스프링 패드 리스트
+        let jumpRings = []; // 공중 터치식 점프 링 리스트
+        let particles = [];
+        let finishLineX = 7500; // 스테이지 탈출 지점
+
+        // 캠페인 스테이지 구성 (모든 발판이 바닥과 천장에 완전히 단단하게 부착되도록 구조 조정)
+        const stageData = [
+            // Stage 1: 중력 제어와 기하학의 질주 (총 길이: 7500px)
+            {
+                finishLineX: 7500,
+                platforms: [
+                    // --- 초반 완전 안전지대 및 기본 큐브 구간 (0 ~ 2200) ---
+                    // 모든 플랫폼의 높이를 900 - y로 설정하여 바닥(900)에 완전히 붙어있는 기둥/계단 형태로 설계
+                    { x: 0, y: 800, width: 2200, height: 100, color: '#111827' }, 
+                    { x: 1300, y: 640, width: 200, height: 260, color: '#0e7490' }, // 바닥 기둥 발판
+                    { x: 1600, y: 520, width: 250, height: 380, color: '#0e7490' }, // 더 높은 바닥 기둥 발판
+                    { x: 1950, y: 640, width: 200, height: 260, color: '#0e7490' },
+
+                    // --- 볼(Ball) 중력 반전 터널 구간 (2200 ~ 4000) ---
+                    // 바닥과 천장을 두껍게 고정하여 내부 동굴 트랙 형태로 구성
+                    { x: 2200, y: 800, width: 1800, height: 100, color: '#1e293b' }, // 단단한 하단 바닥
+                    { x: 2200, y: 0, width: 1800, height: 200, color: '#475569' },   // 천장에 밀착된 단단한 천장벽
+                    
+                    // 내부 지형 발판들도 공중에 뜨지 않고 위벽/아래벽에 완전히 결착
+                    { x: 2600, y: 680, width: 150, height: 120, color: '#0e7490' }, // 바닥에서 돌출
+                    { x: 3000, y: 200, width: 200, height: 180, color: '#0e7490' }, // 천장에서 하향 돌출
+                    { x: 3400, y: 680, width: 150, height: 120, color: '#0e7490' }, // 바닥에서 돌출
+
+                    // --- 비행기(Ship) 터널 훈련 구간 (4000 ~ 5800) ---
+                    { x: 4000, y: 800, width: 1800, height: 100, color: '#111827' },
+                    { x: 4000, y: 0, width: 1800, height: 150, color: '#334155' },   // 고정 천장벽
+                    
+                    // 비행 기둥 장애물 (바닥/천장에 정확히 닿아있도록 높이 설계)
+                    { x: 4400, y: 500, width: 120, height: 400, color: '#be185d' }, // 바닥 기둥
+                    { x: 4800, y: 150, width: 100, height: 260, color: '#be185d' }, // 천장 기둥
+                    { x: 5200, y: 550, width: 120, height: 350, color: '#be185d' }, // 바닥 기둥
+
+                    // --- 후반 큐브 기믹 테크닉 구간 (5800 ~ 7500) ---
+                    { x: 5800, y: 800, width: 1700, height: 100, color: '#111827' },
+                    { x: 6100, y: 640, width: 150, height: 260, color: '#0e7490' },
+                    { x: 6450, y: 500, width: 180, height: 400, color: '#0e7490' },
+                    { x: 6900, y: 640, width: 250, height: 260, color: '#0e7490' }
+                ],
+                spikes: [
+                    // 초반 가시 (스폰킬 완벽 제거)
+                    { x: 1400, y: 760, count: 1 }, 
+                    { x: 1750, y: 760, count: 2 },
+                    { x: 2100, y: 760, count: 2 },
+
+                    // 볼 구간 가시 함정
+                    { x: 2450, y: 760, count: 2 },
+                    { x: 3050, y: 380, count: 2, upsideDown: true }, // 천장 기둥 밑에 부착된 가시
+                    { x: 3200, y: 760, count: 3 },
+                    { x: 3600, y: 200, count: 2, upsideDown: true },
+
+                    // 비행기 구간 정밀 가시 지대
+                    { x: 4200, y: 760, count: 4 },
+                    { x: 4800, y: 410, count: 2, upsideDown: true }, // 천장 장애물 끝에 역가시 부착
+                    { x: 5000, y: 760, count: 5 },
+                    { x: 5400, y: 150, count: 3, upsideDown: true },
+
+                    // 후반 큐브 가시 콤보
+                    { x: 6000, y: 760, count: 3 },
+                    { x: 6350, y: 760, count: 2 },
+                    { x: 6750, y: 760, count: 4 },
+                    { x: 7200, y: 760, count: 3 }
+                ],
+                portals: [
+                    { x: 2150, y: 500, type: MODE_BALL }, // 볼 변신 포탈 (Orange)
+                    { x: 3950, y: 500, type: MODE_SHIP }, // 비행기 변신 포탈 (Magenta)
+                    { x: 5750, y: 500, type: MODE_CUBE }  // 큐브 기본 포탈 (Green)
+                ],
+                jumpPads: [
+                    // 바닥에 부착된 발판들 위에 점프패드 위치 지정
+                    { x: 1100, y: 790 },
+                    { x: 6135, y: 630 },
+                    { x: 6985, y: 630 }
+                ],
+                jumpRings: [
+                    // 공중 링 기믹
+                    { x: 1500, y: 380 },
+                    { x: 6550, y: 350 },
+                    { x: 6680, y: 350 }
+                ]
+            },
+            // Stage 2: 중력 역행과 기하학적 차원 (총 길이: 8500px)
+            {
+                finishLineX: 8500,
+                platforms: [
+                    // --- 안전 스폰지대 (0 ~ 1300) ---
+                    { x: 0, y: 800, width: 1600, height: 100, color: '#111827' },
+                    
+                    // --- 비행기 인트로 (1300 ~ 3000) ---
+                    { x: 1600, y: 800, width: 1400, height: 100, color: '#1e293b' },
+                    { x: 1600, y: 0, width: 1400, height: 150, color: '#475569' }, // 고정 상단벽
+                    { x: 1900, y: 550, width: 150, height: 350, color: '#be185d' }, // 바닥 기둥
+                    { x: 2400, y: 150, width: 150, height: 300, color: '#be185d' }, // 천장 기둥
+
+                    // --- 볼 중력 트랙 (3000 ~ 5200) ---
+                    { x: 3000, y: 800, width: 2200, height: 100, color: '#111827' },
+                    { x: 3000, y: 0, width: 2200, height: 200, color: '#475569' },  // 천장 장벽
+                    { x: 3400, y: 680, width: 200, height: 120, color: '#0e7490' },
+                    { x: 3800, y: 200, width: 200, height: 180, color: '#0e7490' },
+                    { x: 4200, y: 680, width: 200, height: 120, color: '#0e7490' },
+                    { x: 4600, y: 200, width: 200, height: 180, color: '#0e7490' },
+
+                    // --- 최종 큐브 테크놀로지 코스 (5200 ~ 8500) ---
+                    { x: 5200, y: 800, width: 3300, height: 100, color: '#111827' },
+                    { x: 5600, y: 640, width: 180, height: 260, color: '#0e7490' },
+                    { x: 6100, y: 480, width: 180, height: 420, color: '#0e7490' },
+                    { x: 6600, y: 640, width: 250, height: 260, color: '#0e7490' },
+                    { x: 7100, y: 520, width: 150, height: 380, color: '#0e7490' },
+                    { x: 7600, y: 640, width: 300, height: 260, color: '#0e7490' }
+                ],
+                spikes: [
+                    { x: 1200, y: 760, count: 1 },
+                    // 비행구간 가시
+                    { x: 1700, y: 760, count: 3 },
+                    { x: 2400, y: 450, count: 3, upsideDown: true }, // 천장 기둥 아래 가시 배치
+                    { x: 2600, y: 760, count: 4 },
+                    // 볼 구간 가시
+                    { x: 3200, y: 760, count: 3 },
+                    { x: 3800, y: 380, count: 3, upsideDown: true },
+                    { x: 4000, y: 760, count: 4 },
+                    { x: 4600, y: 380, count: 3, upsideDown: true },
+                    { x: 4800, y: 760, count: 4 },
+                    // 후반 큐브 링 & 가시 콤보
+                    { x: 5450, y: 760, count: 2 },
+                    { x: 5850, y: 760, count: 3 },
+                    { x: 6350, y: 760, count: 4 },
+                    { x: 6850, y: 760, count: 3 },
+                    { x: 7350, y: 760, count: 4 },
+                    { x: 7900, y: 760, count: 5 }
+                ],
+                portals: [
+                    { x: 1450, y: 500, type: MODE_SHIP },
+                    { x: 2950, y: 500, type: MODE_BALL },
+                    { x: 5150, y: 500, type: MODE_CUBE }
+                ],
+                jumpPads: [
+                    { x: 900, y: 790 },
+                    { x: 5650, y: 630 },
+                    { x: 6685, y: 630 }
+                ],
+                jumpRings: [
+                    { x: 1100, y: 550 },
+                    { x: 6200, y: 350 },
+                    { x: 6280, y: 260 },
+                    { x: 7200, y: 350 }
+                ]
+            }
+        ];
+
+        // 키보드, 클릭, 터치 단일 원터치 통합 바인딩
+        function setupControls() {
+            const pressAction = (e) => {
+                actionPressed = true;
+                if (gameState === STATE_PLAYING) {
+                    if (e) e.preventDefault();
+                }
+            };
+
+            const releaseAction = () => {
+                actionPressed = false;
+            };
+
+            // 키보드 바인딩
+            window.addEventListener('keydown', (e) => {
+                if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    pressAction(e);
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    releaseAction();
+                }
+            });
+
+            // 원터치 패드 및 전체화면 상호작용 바인딩
+            const tapZone = document.getElementById('tap-zone');
+            
+            tapZone.addEventListener('mousedown', (e) => pressAction(e));
+            window.addEventListener('mouseup', releaseAction);
+
+            tapZone.addEventListener('touchstart', (e) => pressAction(e));
+            window.addEventListener('touchend', releaseAction);
+
+            // 캔버스 마우스 클릭/터치 조작 직접 지원
+            canvas.addEventListener('mousedown', (e) => pressAction(e));
+            canvas.addEventListener('touchstart', (e) => pressAction(e));
+        }
+
+        // 캔버스 리사이즈 고정
+        function resizeCanvas() {
+            canvas.width = VIEW_WIDTH;
+            canvas.height = VIEW_HEIGHT;
+        }
+
+        // 가이드 스크린 전환 헬퍼
+        function toggleGuideScreen(show) {
+            const startScr = document.getElementById('start-screen');
+            const guideScr = document.getElementById('guide-screen');
+            if (show) {
+                startScr.classList.add('hidden');
+                guideScr.classList.remove('hidden');
+            } else {
+                startScr.classList.remove('hidden');
+                guideScr.classList.add('hidden');
+            }
+        }
+
+        // 스테이지 로딩 및 기믹 배치
+        function loadStage(stageIndex) {
+            const index = stageIndex - 1;
+            const data = stageData[index];
+
+            platforms = JSON.parse(JSON.stringify(data.platforms));
+            finishLineX = data.finishLineX;
+            
+            // 가시 정밀 스폰화
+            spikes = [];
+            data.spikes.forEach(s => {
+                const height = 50;
+                const width = 45;
+                for (let i = 0; i < s.count; i++) {
+                    spikes.push({
+                        x: s.x + (i * width),
+                        y: s.upsideDown ? s.y : s.y - 10,
+                        width: width,
+                        height: height,
+                        upsideDown: s.upsideDown || false
+                    });
+                }
+            });
+
+            // 점프패드 & 점프링 빌드
+            jumpPads = JSON.parse(JSON.stringify(data.jumpPads));
+            jumpRings = JSON.parse(JSON.stringify(data.jumpRings)).map(jr => {
+                return { ...jr, active: true }; // 한 번 사용하면 쿨타임 주기 위해 속성 추가
+            });
+
+            // 포탈 빌드
+            portals = JSON.parse(JSON.stringify(data.portals));
+
+            // 플레이어 물리속성 리빌딩
+            player.x = 100;
+            player.y = 500;
+            player.vy = 0;
+            player.mode = MODE_CUBE;
+            player.isGrounded = false;
+            player.trail = [];
+            player.rotation = 0;
+            player.gravityDirection = 1; // 큐브 기본 정상 중력으로 스타트
+
+            camera.x = 0;
+            particles = [];
+            actionPressed = false;
+            prevActionPressed = false;
+            progressPercent = 0;
+
+            const progBar = document.getElementById('progress-container');
+            progBar.classList.remove('hidden');
+            updateProgressBar();
+        }
+
+        // 프로그레스 바 UI 실시간 갱신
+        function updateProgressBar() {
+            const bar = document.getElementById('progress-bar');
+            const text = document.getElementById('progress-text');
+            bar.style.width = progressPercent + '%';
+            text.textContent = progressPercent + '%';
+        }
+
+        // 사이버 네온 파티클 생성
+        function spawnParticles(x, y, color, count = 10, isFlame = false) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: isFlame ? -SPEED_X * 0.5 - Math.random() * 5 : (Math.random() - 0.5) * 16,
+                    vy: isFlame ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 16 - 2,
+                    radius: isFlame ? 3 + Math.random() * 5 : 4 + Math.random() * 8,
+                    color: color,
+                    alpha: 1,
+                    decay: isFlame ? 0.06 + Math.random() * 0.05 : 0.02 + Math.random() * 0.03
+                });
+            }
+        }
+
+        // 스타트 통합 제어
+        function startGame() {
+            gameState = STATE_PLAYING;
+            document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+            
+            currentStage = 1;
+            document.getElementById('stage-display').textContent = 'STAGE ' + currentStage;
+            loadStage(currentStage);
+        }
+
+        // 오버레이 노출 필터링
+        function showOverlayScreen(screenId) {
+            document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('guide-screen').classList.add('hidden');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('clear-screen').classList.add('hidden');
+            document.getElementById('game-complete-screen').classList.add('hidden');
+
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function triggerGameOver() {
+            gameState = STATE_GAMEOVER;
+            spawnParticles(player.x + player.width / 2, player.y + player.height / 2, '#ff007f', 40);
+            
+            document.getElementById('crash-percent').textContent = progressPercent + '%';
+            showOverlayScreen('gameover-screen');
+        }
+
+        function triggerStageClear() {
+            gameState = STATE_CLEAR;
+            spawnParticles(player.x + player.width / 2, player.y + player.height / 2, '#00ffff', 50);
+            
+            if (currentStage < stageData.length) {
+                showOverlayScreen('clear-screen');
+            } else {
+                gameState = STATE_COMPLETE;
+                showOverlayScreen('game-complete-screen');
+            }
+        }
+
+        function restartCurrentGame() {
+            document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+            gameState = STATE_PLAYING;
+            loadStage(currentStage);
+        }
+
+        function nextStage() {
+            currentStage++;
+            document.getElementById('stage-display').textContent = 'STAGE ' + currentStage;
+            document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+            gameState = STATE_PLAYING;
+            loadStage(currentStage);
+        }
+
+        function showMainMenu() {
+            gameState = STATE_MENU;
+            document.getElementById('progress-container').classList.add('hidden');
+            showOverlayScreen('start-screen');
+        }
+
+        // 게임 코어 업데이트 핸들러
+        function update() {
+            if (gameState !== STATE_PLAYING) {
+                updateParticles();
+                return;
+            }
+
+            // 이번 프레임의 신규 단발 탭 입력 검출 (큐브나 볼 모드 기믹 작동에 유리)
+            const isNewTap = actionPressed && !prevActionPressed;
+
+            // 1. 우측 고속 스크롤
+            player.x += SPEED_X;
+
+            // 2. 캐릭터 모드별 물리 분기점
+            if (player.mode === MODE_CUBE) {
+                // 큐브 모드 기본 중력 낙하
+                player.vy += GRAVITY_CUBE * player.gravityDirection;
+
+                // 연속 점프 지원 (지상 밀착 점프)
+                if (actionPressed && player.isGrounded) {
+                    player.vy = -JUMP_FORCE_CUBE * player.gravityDirection;
+                    player.isGrounded = false;
+                    spawnParticles(player.x, player.gravityDirection === 1 ? player.y + player.height : player.y, '#00ffff', 5);
+                }
+
+                // 공중 체공 회전 구현
+                if (!player.isGrounded) {
+                    player.rotation += 0.09 * player.gravityDirection;
+                } else {
+                    // 바닥 정착 시 90도 직각 맞춤 스냅 적용
+                    const angleStep = Math.PI / 2;
+                    player.rotation = Math.round(player.rotation / angleStep) * angleStep;
+                }
+
+            } else if (player.mode === MODE_SHIP) {
+                // 비행기(Ship) 모드 물리 (Hold to rise / Release to dive)
+                if (actionPressed) {
+                    player.vy -= THRUST_SHIP * player.gravityDirection;
+                    player.thrustFlameTick++;
+                    if (player.thrustFlameTick % 3 === 0) {
+                        spawnParticles(player.x, player.y + player.height / 2 + (10 * player.gravityDirection), '#f43f5e', 2, true);
+                    }
+                } else {
+                    player.vy += GRAVITY_SHIP * player.gravityDirection;
+                }
+
+                // 이동 상한속도 제한
+                const maxShipSpeed = 10.0;
+                if (Math.abs(player.vy) > maxShipSpeed) {
+                    player.vy = maxShipSpeed * Math.sign(player.vy);
+                }
+
+                // 비행 기수 각도 연동
+                player.rotation = player.vy * 0.045;
+
+            } else if (player.mode === MODE_BALL) {
+                // 볼(Ball) 모드 물리: 신규 탭 시 공중 중력 방향 즉시 교체
+                player.vy += GRAVITY_CUBE * player.gravityDirection;
+
+                if (isNewTap && player.isGrounded) {
+                    // 중력 반전
+                    player.gravityDirection *= -1;
+                    player.isGrounded = false;
+                    spawnParticles(player.x + player.width / 2, player.y + player.height / 2, '#fb923c', 8);
+                }
+
+                // 볼 모드 구르는 바퀴 휠 회전 연출
+                player.rotation += 0.12 * player.gravityDirection;
+            }
+
+            // 상하 위치 임시 갱신 및 발판 밟기 보정 연산
+            player.y += player.vy;
+            player.isGrounded = false;
+            handleVerticalCollision();
+
+            // 전방 장애물(수평벽) 충돌 정밀 검사 (옆면 닿는 즉시 사망)
+            handleHorizontalCollision();
+
+            // 상하단 맵 이탈 사망 한계점 가드라인
+            if (player.y < 0 || player.y + player.height > VIEW_HEIGHT) {
+                triggerGameOver();
+            }
+
+            // 3. 지메 자동 점프 패드(Jump Pad) 충돌
+            for (let pad of jumpPads) {
+                if (player.x + player.width > pad.x && player.x < pad.x + 80) {
+                    if (Math.abs((player.y + player.height) - pad.y) < 20 && player.vy >= 0) {
+                        player.vy = -JUMP_FORCE_CUBE * 1.35 * player.gravityDirection; // 고속 바운스 업그레이드
+                        player.isGrounded = false;
+                        spawnParticles(pad.x + 40, pad.y, '#facc15', 12);
+                    }
+                }
+            }
+
+            // 4. 지메 공중 터치 점프링(Jump Ring) 정밀 감지
+            if (isNewTap) {
+                for (let ring of jumpRings) {
+                    if (ring.active) {
+                        const rCenterX = ring.x + 25;
+                        const rCenterY = ring.y + 25;
+                        const pCenterX = player.x + player.width / 2;
+                        const pCenterY = player.y + player.height / 2;
+
+                        // 고리 반경 95px 이내 영역 통과 중에 탭하는가 감사
+                        if (Math.hypot(rCenterX - pCenterX, rCenterY - pCenterY) < 95) {
+                            player.vy = -JUMP_FORCE_CUBE * 1.05 * player.gravityDirection; // 공중 재도약
+                            player.isGrounded = false;
+                            spawnParticles(rCenterX, rCenterY, '#fde047', 15);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 잔상 효과 수집
+            player.trail.push({ x: player.x, y: player.y, rotation: player.rotation, mode: player.mode });
+            if (player.trail.length > 12) player.trail.shift();
+
+            // 5. 모드 체인지 고속 네온 변신 포탈 통과 연산
+            for (let pt of portals) {
+                const dist = Math.hypot((player.x + player.width / 2) - pt.x, (player.y + player.height / 2) - pt.y);
+                if (dist < 80) {
+                    if (player.mode !== pt.type) {
+                        player.mode = pt.type;
+                        
+                        // 볼 모드 진입 시 강제 중력 정렬 초기화 가드
+                        if (pt.type === MODE_BALL) {
+                            player.gravityDirection = 1;
+                        } else if (pt.type === MODE_CUBE) {
+                            player.gravityDirection = 1;
+                        }
+
+                        player.vy = -3 * player.gravityDirection; // 체인지 부스터 가속감
+                        spawnParticles(pt.x, pt.y, pt.type === MODE_SHIP ? '#ec4899' : (pt.type === MODE_BALL ? '#f97316' : '#10b981'), 25);
+                    }
+                }
+            }
+
+            // 6. 가시(Spike) 정밀 안전마진 충돌사 판정 (히트박스 축소 적용)
+            const marginX = 15;
+            const marginY = 12;
+            for (let s of spikes) {
+                if (player.x + marginX < s.x + s.width &&
+                    player.x + player.width - marginX > s.x) {
+                    
+                    if (s.upsideDown) {
+                        if (player.y < s.y + s.height - marginY) {
+                            triggerGameOver();
+                            break;
+                        }
+                    } else {
+                        if (player.y + player.height - marginY > s.y) {
+                            triggerGameOver();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 진행율 실시간 정산
+            progressPercent = Math.min(100, Math.floor((player.x / finishLineX) * 100));
+            updateProgressBar();
+
+            if (player.x >= finishLineX) {
+                triggerStageClear();
+            }
+
+            // 지메 고유 스크롤 카메라 갱신
+            camera.targetX = player.x - 280;
+            camera.x += (camera.targetX - camera.x) * 0.25;
+
+            updateParticles();
+
+            // 이전 입력 세팅 저장
+            prevActionPressed = actionPressed;
+        }
+
+        // 수평 정면벽 충돌 (옆면 기물 충돌 시 즉각 사망)
+        function handleHorizontalCollision() {
+            for (let p of platforms) {
+                if (player.y + player.height - 6 > p.y && player.y + 6 < p.y + p.height) {
+                    if (player.x + player.width > p.x && player.x < p.x + 15) {
+                        triggerGameOver();
+                    }
+                }
+            }
+        }
+
+        // 수직 바닥/천장 착지 및 중력 충돌 보정
+        function handleVerticalCollision() {
+            for (let p of platforms) {
+                if (player.x + player.width > p.x && player.x < p.x + p.width) {
+                    if (player.y + player.height > p.y && player.y < p.y + p.height) {
+                        // 정상 중력 착지
+                        if (player.vy > 0 && player.gravityDirection === 1) {
+                            player.y = p.y - player.height;
+                            player.vy = 0;
+                            player.isGrounded = true;
+                        } 
+                        // 반전 중력 천장 착지 (볼 모드용)
+                        else if (player.vy < 0 && player.gravityDirection === -1) {
+                            player.y = p.y + p.height;
+                            player.vy = 0;
+                            player.isGrounded = true;
+                        } 
+                        // 역방향 충돌 시 (즉 바닥에 머리를 찧는 경우) 사망 처리
+                        else if (player.vy < 0 && player.gravityDirection === 1) {
+                            triggerGameOver();
+                        } else if (player.vy > 0 && player.gravityDirection === -1) {
+                            triggerGameOver();
+                        }
+                    }
+                }
+            }
+        }
+
+        // 파티클 상태 제어 루프
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // 전체 캔버스 그리기 프레임
+        function draw() {
+            ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+            // 가로 질주형 테크노 네온 백그라운드 그리드 드로잉
+            drawCyberpunkGrid();
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // 1. 발판 구조물(Platform) 드로잉 (블루 네온 글로우 테두리)
+            for (let p of platforms) {
+                ctx.save();
+                ctx.fillStyle = '#0f172a'; 
+                ctx.strokeStyle = '#06b6d4'; 
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#06b6d4';
+
+                ctx.beginPath();
+                ctx.rect(p.x, p.y, p.width, p.height);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 2. 가시(Spike) 드로잉 (레드 크롬 네온)
+            for (let s of spikes) {
+                ctx.save();
+                ctx.fillStyle = '#1e1b4b'; 
+                ctx.strokeStyle = '#f43f5e'; 
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#f43f5e';
+
+                ctx.beginPath();
+                if (s.upsideDown) {
+                    ctx.moveTo(s.x, s.y);
+                    ctx.lineTo(s.x + s.width / 2, s.y + s.height);
+                    ctx.lineTo(s.x + s.width, s.y);
+                } else {
+                    ctx.moveTo(s.x, s.y + s.height);
+                    ctx.lineTo(s.x + s.width / 2, s.y);
+                    ctx.lineTo(s.x + s.width, s.y + s.height);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 3. 변신 고리 포탈(Portals) 드로잉
+            for (let pt of portals) {
+                ctx.save();
+                const isShip = pt.type === MODE_SHIP;
+                const isBall = pt.type === MODE_BALL;
+                const portalColor = isShip ? '#ec4899' : (isBall ? '#f97316' : '#10b981');
+                const pulse = Math.sin(Date.now() * 0.01) * 8;
+
+                ctx.strokeStyle = portalColor;
+                ctx.lineWidth = 6;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = portalColor;
+
+                // 타원 형태
+                ctx.beginPath();
+                ctx.ellipse(pt.x, pt.y, 35 + pulse / 2, 75, 0, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(pt.x, pt.y, 10, 55, 0, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 모드 텍스트 배너 라벨
+                ctx.fillStyle = portalColor;
+                ctx.font = 'bold 15px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(isShip ? 'SHIP' : (isBall ? 'BALL' : 'CUBE'), pt.x, pt.y - 90);
+                ctx.restore();
+            }
+
+            // 4. 지메 점프 패드(Jump Pad) 그리기 (노란색 네온 쿠션 발판)
+            for (let pad of jumpPads) {
+                ctx.save();
+                ctx.fillStyle = '#eab308'; 
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#eab308';
+
+                ctx.beginPath();
+                ctx.roundRect(pad.x, pad.y, 80, 15, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                // 내부 디자인
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(pad.x + 15, pad.y + 4, 50, 4);
+                ctx.restore();
+            }
+
+            // 5. 지메 공중 점프 링(Jump Ring) 그리기
+            for (let ring of jumpRings) {
+                if (ring.active) {
+                    ctx.save();
+                    const floatOffset = Math.sin(Date.now() * 0.008 + ring.x) * 6; 
+                    
+                    ctx.strokeStyle = '#facc15'; 
+                    ctx.lineWidth = 4;
+                    ctx.shadowBlur = 18;
+                    ctx.shadowColor = '#facc15';
+
+                    ctx.beginPath();
+                    ctx.arc(ring.x + 25, ring.y + 25 + floatOffset, 20, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(ring.x + 25, ring.y + 25 + floatOffset, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // 6. 맵 골라인 레이저 바인더
+            ctx.save();
+            ctx.strokeStyle = '#d946ef'; 
+            ctx.lineWidth = 8;
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#d946ef';
+            
+            ctx.beginPath();
+            ctx.moveTo(finishLineX, 0);
+            ctx.lineTo(finishLineX, VIEW_HEIGHT);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.fillText('GOAL', finishLineX - 45, 100);
+            ctx.restore();
+
+            // 7. 네온 주행 꼬리 잔상(Trail) 렌더링
+            for (let i = 0; i < player.trail.length; i++) {
+                const t = player.trail[i];
+                const alpha = (i + 1) / (player.trail.length + 1) * 0.4;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(t.x + player.width / 2, t.y + player.height / 2);
+                ctx.rotate(t.rotation);
+
+                if (t.mode === MODE_CUBE) {
+                    ctx.fillStyle = 'rgba(6, 182, 212, 0.4)'; 
+                    ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+                } else if (t.mode === MODE_SHIP) {
+                    ctx.fillStyle = 'rgba(236, 72, 153, 0.4)'; 
+                    drawRawShipShape(ctx, player.width, player.height);
+                } else {
+                    ctx.strokeStyle = 'rgba(249, 115, 22, 0.4)';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, player.width / 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // 8. 플레이어 본체 렌더링
+            if (gameState === STATE_PLAYING) {
+                ctx.save();
+                ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+                ctx.rotate(player.rotation);
+                ctx.shadowBlur = 20;
+
+                if (player.mode === MODE_CUBE) {
+                    ctx.shadowColor = '#22d3ee';
+                    ctx.fillStyle = '#0891b2'; 
+                    ctx.strokeStyle = '#ffffff'; 
+                    ctx.lineWidth = 4;
+
+                    ctx.beginPath();
+                    ctx.rect(-player.width / 2, -player.height / 2, player.width, player.height);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(-player.width / 4, -player.height / 4, player.width / 2, player.height / 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(-player.width / 8, -player.height / 8, player.width / 4, player.height / 4);
+
+                } else if (player.mode === MODE_SHIP) {
+                    ctx.shadowColor = '#f43f5e';
+                    ctx.fillStyle = '#be185d';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 4;
+
+                    drawRawShipShape(ctx, player.width, player.height);
+
+                } else if (player.mode === MODE_BALL) {
+                    ctx.shadowColor = '#f97316';
+                    ctx.fillStyle = '#c2410c';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 4;
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, player.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(-player.width / 2, 0);
+                    ctx.lineTo(player.width / 2, 0);
+                    ctx.moveTo(0, -player.width / 2);
+                    ctx.lineTo(0, player.width / 2);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, player.width / 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            // 9. 파티클 이펙터 드로잉
+            for (let p of particles) {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        // 제트선 미사일 드로잉 날개 조형
+        function drawRawShipShape(context, w, h) {
+            context.beginPath();
+            context.moveTo(-w / 2, 5);
+            context.lineTo(-w / 4, -h / 3);
+            context.lineTo(w / 3, -h / 4);
+            context.lineTo(w / 2, 0);
+            context.lineTo(w / 3, h / 4);
+            context.lineTo(-w / 4, h / 3);
+            context.lineTo(-w / 2, h / 4);
+            context.closePath();
+            context.fill();
+            context.stroke();
+
+            context.fillStyle = '#38bdf8'; 
+            context.beginPath();
+            context.arc(w / 8, -h / 12, 6, 0, Math.PI * 2);
+            context.fill();
+        }
+
+        // 배경 그리드 망 그리기
+        function drawCyberpunkGrid() {
+            const scrollOffset = (camera.x * 0.3) % 100;
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.08)'; 
+            ctx.lineWidth = 2;
+
+            for (let x = -scrollOffset; x < VIEW_WIDTH; x += 100) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, VIEW_HEIGHT);
+                ctx.stroke();
+            }
+
+            for (let y = 0; y < VIEW_HEIGHT; y += 100) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(VIEW_WIDTH, y);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(219, 39, 119, 0.02)';
+            ctx.beginPath();
+            ctx.arc(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 350, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 전체 애니메이션 순환 루프
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // 최초 스타트 트리거
+        window.onload = function() {
+            setupControls();
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            loop();
+        };
+    </script>
+</body>
+</html>
